@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CLOUDCRAFT</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game"></div>
+
+  <!-- HUD -->
+  <div id="title">☁️ CLOUDCRAFT</div>
+  <div id="guide">
+    <b>Controls</b><br>
+    W A S D &nbsp;Move<br>
+    Space &nbsp;Jump<br>
+    Mouse &nbsp;Look<br>
+    Left click &nbsp;Break<br>
+    Right click &nbsp;Place<br>
+    1–6 / Scroll &nbsp;Choose block<br>
+    Esc &nbsp;Pause
+  </div>
+  <div id="crosshair"></div>
+  <div id="blockName"></div>
+  <div id="hotbar"></div>
+
+  <!-- Start / Pause menu -->
+  <div id="overlay">
+    <div class="panel">
+      <h1>☁️ CLOUDCRAFT</h1>
+      <p id="msg">Build your own world in the sky.</p>
+      <button id="playBtn">Click to Play</button>
+      <button id="restartBtn" class="secondary">Restart World</button>
+      <small>W A S D to move · Space to jump · Left click breaks · Right click places</small>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
