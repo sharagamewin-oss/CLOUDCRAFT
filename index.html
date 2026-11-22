@@ -16,13 +16,16 @@
     W A S D &nbsp;Move<br>
     Space &nbsp;Jump<br>
     Mouse &nbsp;Look<br>
-    Left click &nbsp;Break<br>
+    Hold left click &nbsp;Break<br>
     Right click &nbsp;Place<br>
-    1–6 / Scroll &nbsp;Choose block<br>
+    1–8 / Scroll &nbsp;Choose block<br>
+    E &nbsp;Crafting<br>
     R &nbsp;Change weather<br>
     Esc &nbsp;Pause / Save
   </div>
   <div id="status"></div>
+  <div id="tools"></div>
+  <div id="mineWrap"><div id="mineBar"></div></div>
   <div id="toast"></div>
   <div id="crosshair"></div>
   <div id="blockName"></div>
@@ -37,6 +40,16 @@
       <div id="slots"></div>
       <button id="restartBtn" class="secondary">Restart World</button>
       <small>W A S D to move · Space to jump · Left click breaks · Right click places</small>
+    </div>
+  </div>
+
+  <!-- Crafting menu (press E) -->
+  <div id="craftWrap">
+    <div class="panel">
+      <h1 style="font-size:30px">🔨 Crafting</h1>
+      <p>Use what you collected</p>
+      <div id="recipes"></div>
+      <button id="craftClose">Close (E)</button>
     </div>
   </div>
 
