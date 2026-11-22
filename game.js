@@ -10,8 +10,8 @@
   // ---------------------------------------------------------------
   // Block types
   // ---------------------------------------------------------------
-  const GRASS = 0, DIRT = 1, STONE = 2, WOOD = 3, GLASS = 4, BRICK = 5;
-  const NAMES = ['Grass', 'Dirt', 'Stone', 'Wood', 'Glass', 'Brick'];
+  const GRASS = 0, DIRT = 1, STONE = 2, WOOD = 3, GLASS = 4, BRICK = 5, LOG = 6, LEAVES = 7;
+  const NAMES = ['Grass', 'Dirt', 'Stone', 'Wood', 'Glass', 'Brick', 'Log', 'Leaves'];
 
   // ---------------------------------------------------------------
   // Procedural 16x16 textures (original, no copied assets)
@@ -84,6 +84,21 @@
     g.fillRect(3, 3, 2, 1); g.fillRect(4, 4, 2, 1); g.fillRect(5, 5, 2, 1);
   });
 
+  T.logSide = makeTex(88, (g, r) => {
+    fillN(g, r, [112, 80, 50], 20);
+    g.fillStyle = 'rgba(60,38,20,0.5)';
+    [2, 6, 9, 13].forEach(x => g.fillRect(x, 0, 1, 16));
+  });
+  T.logTop = makeTex(99, (g, r) => {
+    fillN(g, r, [192, 152, 102], 16);
+    g.strokeStyle = 'rgba(110,70,35,0.7)'; g.lineWidth = 1;
+    g.strokeRect(1.5, 1.5, 13, 13); g.strokeRect(4.5, 4.5, 7, 7);
+  });
+  T.leaves = makeTex(123, (g, r) => {
+    fillN(g, r, [62, 158, 68], 46);
+    for (let i = 0; i < 44; i++) g.clearRect(Math.floor(r() * 16), Math.floor(r() * 16), 1, 1);
+  });
+
   const lam = (t, extra) => new THREE.MeshLambertMaterial(Object.assign({ map: t.tex }, extra || {}));
   const all6 = m => [m, m, m, m, m, m];
   const glassMat = lam(T.glass, { transparent: true, depthWrite: false });
@@ -95,9 +110,11 @@
     all6(lam(T.stone)),
     all6(lam(T.wood)),
     all6(glassMat),
-    all6(lam(T.brick))
+    all6(lam(T.brick)),
+    (() => { const s = lam(T.logSide), t = lam(T.logTop); return [s, s, t, t, s, s]; })(),
+    all6(lam(T.leaves, { alphaTest: 0.5 }))
   ];
-  const ICONS = [T.grassTop.url, T.dirt.url, T.stone.url, T.wood.url, T.glass.url, T.brick.url];
+  const ICONS = [T.grassTop.url, T.dirt.url, T.stone.url, T.wood.url, T.glass.url, T.brick.url, T.logSide.url, T.leaves.url];
 
   // ---------------------------------------------------------------
   // Scene, camera, renderer, lights
@@ -166,13 +183,13 @@
   function exposed(b) {
     for (let i = 0; i < 6; i++) {
       const n = world.get(K(b.x + NB[i][0], b.y + NB[i][1], b.z + NB[i][2]));
-      if (!n || (n.t === GLASS && b.t !== GLASS)) return true;
+      if (!n || ((n.t === GLASS || n.t === LEAVES) && b.t !== n.t)) return true;
     }
     return false;
   }
 
   function rebuild() {
-    const counts = [0, 0, 0, 0, 0, 0];
+    const counts = MATS.map(() => 0);
     world.forEach(b => {
       if (counts[b.t] >= CAP || !exposed(b)) return;
       dummy.position.set(b.x + 0.5, b.y + 0.5, b.z + 0.5);
@@ -219,6 +236,25 @@
       if (y === null) return;
       for (let i = 1; i <= p[2]; i++) setBlock(p[0], y + i, p[1], STONE);
     });
+    // trees (same every time the world is generated)
+    const tr = rng(2024), trees = [];
+    for (let tries = 0; trees.length < 11 && tries < 300; tries++) {
+      const x = Math.floor(tr() * 25) - 12, z = Math.floor(tr() * 25) - 12, dist = Math.hypot(x, z);
+      if (dist < 4 || dist > 10.5) continue;
+      if (trees.some(q => Math.hypot(q[0] - x, q[1] - z) < 3.5)) continue;
+      const y = topY(x, z);
+      if (y === null || world.get(K(x, y, z)).t !== GRASS || hasBlock(x, y + 1, z)) continue;
+      const h = 4 + Math.floor(tr() * 2);
+      trees.push([x, z]);
+      for (let dy = h - 1; dy <= h + 2; dy++) {
+        const r = dy <= h ? 2 : (dy === h + 1 ? 1 : 0);
+        for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+          if (r === 2 && Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+          if (!hasBlock(x + dx, y + dy, z + dz)) setBlock(x + dx, y + dy, z + dz, LEAVES);
+        }
+      }
+      for (let i = 1; i <= h; i++) setBlock(x, y + i, z, LOG);
+    }
     // remember the untouched world so saves only store your changes
     baseline = new Map();
     world.forEach((b, k) => baseline.set(k, { x: b.x, y: b.y, z: b.z, t: b.t }));
@@ -357,12 +393,15 @@
 
   function placeBlock() {
     if (!target) return;
+    if (inv[selected] <= 0) { showToast('No ' + NAMES[selected] + ' left - collect some first!'); return; }
     const x = target.c[0] + target.n[0], y = target.c[1] + target.n[1], z = target.c[2] + target.n[2];
     if (hasBlock(x, y, z)) return;
     if (Math.abs(x) > 200 || Math.abs(z) > 200 || y < -120 || y > 120) return;
     // not inside the player
     if (x + 1 > P.x - 0.3 && x < P.x + 0.3 && y + 1 > P.y && y < P.y + 1.8 && z + 1 > P.z - 0.3 && z < P.z + 0.3) return;
     setBlock(x, y, z, selected);
+    inv[selected]--;
+    updateHotbar();
     dirty = true;
   }
 
@@ -377,14 +416,14 @@
   NAMES.forEach((n, i) => {
     const s = document.createElement('div');
     s.className = 'slot';
-    s.innerHTML = '<span class="num">' + (i + 1) + '</span><img src="' + ICONS[i] + '" alt="' + n + '">';
+    s.innerHTML = '<span class="num">' + (i + 1) + '</span><img src="' + ICONS[i] + '" alt="' + n + '"><span class="cnt">0</span>';
     s.addEventListener('click', e => { e.stopPropagation(); select(i); });
     hotbar.appendChild(s);
     slots.push(s);
   });
 
   function select(i) {
-    selected = (i + 6) % 6;
+    selected = (i + NAMES.length) % NAMES.length;
     slots.forEach((s, k) => s.classList.toggle('selected', k === selected));
     nameEl.textContent = NAMES[selected];
     nameEl.classList.add('show');
@@ -406,11 +445,15 @@
 
   playBtn.addEventListener('click', lock);
   overlay.addEventListener('click', e => { if (e.target === overlay) lock(); });
-  restartBtn.addEventListener('click', () => { generate(); respawn(); rebuild(); timeOfDay = 0.2; setWeather('clear', true); lock(); });
+  restartBtn.addEventListener('click', () => { generate(); respawn(); rebuild(); resetInv(); timeOfDay = 0.2; setWeather('clear', true); lock(); });
 
   document.addEventListener('pointerlockchange', () => {
     locked = document.pointerLockElement === canvas;
-    overlay.style.display = locked ? 'none' : 'flex';
+    if (locked) crafting = false;
+    overlay.style.display = (locked || crafting) ? 'none' : 'flex';
+    craftWrap.style.display = (!locked && crafting) ? 'flex' : 'none';
+    if (crafting && !locked) refreshCraft();
+    mining = false;
     if (!locked) {
       msg.textContent = 'Game paused';
       playBtn.textContent = 'Resume';
@@ -428,16 +471,21 @@
 
   document.addEventListener('mousedown', e => {
     if (!locked) return;
-    if (e.button === 0) breakBlock();
+    if (e.button === 0) mining = true;
     else if (e.button === 2) placeBlock();
   });
+  document.addEventListener('mouseup', e => { if (e.button === 0) mining = false; });
   document.addEventListener('contextmenu', e => e.preventDefault());
 
   document.addEventListener('keydown', e => {
     keys[e.code] = true;
     if (e.code === 'Space') e.preventDefault();
     if (e.code === 'KeyR' && locked) cycleWeather();
-    if (e.code >= 'Digit1' && e.code <= 'Digit6') select(parseInt(e.code.slice(5), 10) - 1);
+    if (e.code === 'KeyE') {
+      if (locked) { crafting = true; document.exitPointerLock(); }
+      else if (crafting) closeCraft();
+    }
+    if (e.code >= 'Digit1' && e.code <= 'Digit8') select(parseInt(e.code.slice(5), 10) - 1);
   });
   document.addEventListener('keyup', e => { keys[e.code] = false; });
 
@@ -579,7 +627,7 @@
     const data = {
       v: 2, saved: Date.now(), added: added, removed: removed,
       p: { x: P.x, y: P.y, z: P.z, yaw: P.yaw, pitch: P.pitch },
-      time: timeOfDay, sel: selected, weather: weather
+      time: timeOfDay, sel: selected, weather: weather, inv: inv, axe: axeLvl, pick: pickLvl
     };
     try {
       localStorage.setItem(SKEY(n), JSON.stringify(data));
@@ -595,11 +643,14 @@
     if (!d || !Array.isArray(d.added) || !Array.isArray(d.removed)) { showToast('World ' + n + ' is empty'); return; }
     generate();
     d.removed.forEach(r => world.delete(K(r[0], r[1], r[2])));
-    d.added.forEach(a => { if (a[3] >= 0 && a[3] < 6) setBlock(a[0], a[1], a[2], a[3]); });
+    d.added.forEach(a => { if (a[3] >= 0 && a[3] < NAMES.length) setBlock(a[0], a[1], a[2], a[3]); });
     if (d.p) { P.x = d.p.x; P.y = d.p.y; P.z = d.p.z; P.yaw = d.p.yaw || 0; P.pitch = d.p.pitch || 0; P.vy = 0; }
     timeOfDay = typeof d.time === 'number' ? d.time : 0.2;
     select(typeof d.sel === 'number' ? d.sel : 0);
     setWeather(d.weather || 'clear', true);
+    inv = NAMES.map((_, i) => (Array.isArray(d.inv) ? (d.inv[i] | 0) : 0));
+    axeLvl = d.axe | 0; pickLvl = d.pick | 0;
+    updateHotbar(); updateTools();
     rebuild();
     lock();
     showToast('World ' + n + ' loaded 📂');
@@ -630,7 +681,119 @@
   // ---------------------------------------------------------------
   // Main loop
   // ---------------------------------------------------------------
+  // ---------------------------------------------------------------
+  // Resources: inventory, mining, tools, crafting (Phase 3)
+  // ---------------------------------------------------------------
+  let inv = NAMES.map(() => 0);
+  let axeLvl = 0, pickLvl = 0;
+  let mining = false, mineProg = 0, mineKey = -1, crafting = false;
+  const LEVELS = ['Hands', 'Wood', 'Stone'];
+  const HARD = [0.5, 0.5, 2.2, 0.9, 0.3, 3, 1.0, 0.2];            // seconds by hand
+  const KIND = ['', '', 'pick', 'axe', '', 'pick', 'axe', 'axe']; // which tool helps
+  const MULT = [1, 2.5, 4.5];                                      // speed: hands, wood, stone
+  const toolsEl = document.getElementById('tools');
+  const barWrap = document.getElementById('mineWrap');
+  const barEl = document.getElementById('mineBar');
+  const craftWrap = document.getElementById('craftWrap');
+  const recipesEl = document.getElementById('recipes');
+
+  function resetInv() { inv = NAMES.map(() => 0); axeLvl = 0; pickLvl = 0; updateHotbar(); updateTools(); }
+
+  function updateHotbar() {
+    slots.forEach((s, i) => {
+      s.querySelector('.cnt').textContent = inv[i];
+      s.classList.toggle('empty', inv[i] <= 0);
+    });
+  }
+
+  function updateTools() {
+    toolsEl.textContent = '🪓 ' + LEVELS[axeLvl] + (axeLvl ? ' Axe' : '') + '   ⛏️ ' + LEVELS[pickLvl] + (pickLvl ? ' Pickaxe' : '');
+  }
+
+  function updateMining(dt) {
+    if (!mining || !target || !locked) { mineProg = 0; mineKey = -1; barWrap.style.display = 'none'; return; }
+    const k = K(target.c[0], target.c[1], target.c[2]);
+    const b = world.get(k);
+    if (!b) return;
+    if (k !== mineKey) { mineKey = k; mineProg = 0; }
+    const kind = KIND[b.t];
+    const speed = kind === 'axe' ? MULT[axeLvl] : kind === 'pick' ? MULT[pickLvl] : 1;
+    mineProg += dt * speed / HARD[b.t];
+    barWrap.style.display = 'block';
+    barEl.style.width = Math.min(100, mineProg * 100) + '%';
+    if (mineProg >= 1) {
+      world.delete(k);
+      inv[b.t]++;
+      dirty = true;
+      mineProg = 0; mineKey = -1;
+      barWrap.style.display = 'none';
+      updateHotbar();
+    }
+  }
+
+  const RECIPES = [
+    { name: 'Wood Blocks x4', cost: { 6: 1 }, give: { 3: 4 } },
+    { name: 'Wood Axe', cost: { 3: 3 }, tool: ['axe', 1] },
+    { name: 'Wood Pickaxe', cost: { 3: 3 }, tool: ['pick', 1] },
+    { name: 'Stone Axe', cost: { 2: 3, 3: 2 }, tool: ['axe', 2] },
+    { name: 'Stone Pickaxe', cost: { 2: 3, 3: 2 }, tool: ['pick', 2] },
+    { name: 'Brick x2', cost: { 2: 4 }, give: { 5: 2 } },
+    { name: 'Glass x2', cost: { 1: 2, 2: 1 }, give: { 4: 2 } }
+  ];
+  const curLvl = kind => (kind === 'axe' ? axeLvl : pickLvl);
+  const costText = c => Object.keys(c).map(k => c[k] + ' ' + NAMES[k]).join(' + ');
+
+  function recipeState(r) {
+    if (r.tool) {
+      if (curLvl(r.tool[0]) >= r.tool[1]) return 'Owned';
+      if (curLvl(r.tool[0]) < r.tool[1] - 1) return 'Needs ' + LEVELS[r.tool[1] - 1] + ' tool first';
+    }
+    for (const k in r.cost) if (inv[k] < r.cost[k]) return 'Not enough';
+    return '';
+  }
+
+  function doCraft(r) {
+    if (recipeState(r)) return;
+    for (const k in r.cost) inv[k] -= r.cost[k];
+    if (r.give) for (const k in r.give) inv[k] += r.give[k];
+    if (r.tool) { if (r.tool[0] === 'axe') axeLvl = r.tool[1]; else pickLvl = r.tool[1]; }
+    updateHotbar(); updateTools(); refreshCraft();
+    showToast('Crafted ' + r.name + ' ✨');
+  }
+
+  function refreshCraft() {
+    recipesEl.innerHTML = '';
+    RECIPES.forEach(r => {
+      const st = recipeState(r);
+      const row = document.createElement('div');
+      row.className = 'slotrow';
+      const label = document.createElement('span');
+      label.className = 'slotlabel';
+      label.innerHTML = '<b>' + r.name + '</b><br><i>' + costText(r.cost) + (st && st !== 'Not enough' ? ' · ' + st : '') + '</i>';
+      const btn = document.createElement('button');
+      btn.textContent = st === 'Owned' ? 'Owned' : 'Craft';
+      btn.disabled = !!st;
+      btn.onclick = () => doCraft(r);
+      row.appendChild(label); row.appendChild(btn);
+      recipesEl.appendChild(row);
+    });
+  }
+
+  function closeCraft() {
+    crafting = false;
+    craftWrap.style.display = 'none';
+    overlay.style.display = 'flex';
+    lock();
+  }
+  document.getElementById('craftClose').addEventListener('click', closeCraft);
+
+  // ---------------------------------------------------------------
+  // Start the game
+  // ---------------------------------------------------------------
   refreshSlots();
+  updateHotbar();
+  updateTools();
+  setTimeout(() => showToast('Hold left click on a tree 🌳 to collect logs. Press E to craft!'), 600);
   generate();
   respawn();
   rebuild();
@@ -644,6 +807,7 @@
     if (locked) updatePlayer(dt);
     updateCamera();
     updateTarget();
+    updateMining(dt);
     if (dirty) rebuild();
     updateSky(dt);
     updateWeather(dt);
