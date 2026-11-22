@@ -144,6 +144,33 @@ button.secondary { background: linear-gradient(#8fb4f0, #5f86d0); font-size: 15p
 .slotrow button.secondary-mini { background: linear-gradient(#8fb4f0, #5f86d0); }
 .slotrow button:disabled { opacity: .4; cursor: default; transform: none; }
 
+/* ---------- Phase 3: counts, tools, mining bar, crafting ---------- */
+.slot .cnt {
+  position: absolute; bottom: 1px; right: 5px;
+  font-size: 13px; font-weight: 800; text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
+}
+.slot.empty img { opacity: .35; }
+.slot.empty .cnt { opacity: .6; }
+
+#tools {
+  position: fixed; top: 48px; left: 18px; font-size: 14px; font-weight: 700;
+  text-shadow: 0 1px 4px rgba(40, 80, 140, .8); pointer-events: none; white-space: pre;
+}
+#mineWrap {
+  position: fixed; top: calc(50% + 26px); left: 50%; transform: translateX(-50%);
+  width: 80px; height: 8px; display: none;
+  background: rgba(0, 0, 0, .35); border: 1px solid #fff; border-radius: 6px; overflow: hidden;
+  pointer-events: none;
+}
+#mineBar { height: 100%; width: 0; background: #ffe27a; }
+
+#craftWrap {
+  position: fixed; inset: 0; z-index: 20; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(120, 180, 240, .45); backdrop-filter: blur(4px);
+}
+#craftWrap .panel { width: 440px; max-height: 80vh; overflow-y: auto; }
+
 @media (max-width: 900px) {
   #guide { display: none; }
   .slot { width: 46px; height: 46px; }
